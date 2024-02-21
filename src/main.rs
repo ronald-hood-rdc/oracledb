@@ -6,8 +6,6 @@ use oracle::{
 use std::env;
 use std::fs::File;
 use std::io::{Result as IoResult, Write};
-use std::thread;
-use std::time::Duration;
 
 const LIST_VIEWS_QUERY: &str = "SELECT view_name FROM all_views";
 
@@ -16,9 +14,7 @@ fn main() -> Result<(), Error> {
     let db_url = construct_db_url().unwrap();
     let pool = create_connection_pool(&db_url)?;
     let conn = pool.get()?;
-    execute_and_print_query(&conn, LIST_VIEWS_QUERY)?;
-    thread::sleep(Duration::from_secs(5));
-    
+
     let mut stmt = conn.statement(LIST_VIEWS_QUERY).build()?;
     let rows = stmt.query(&[])?;
 
@@ -93,15 +89,5 @@ fn write_schema_file(views_columns: Vec<(String, Vec<(String, String)>)>) -> IoR
         writeln!(&mut file, "}}\n")?;
     }
 
-    Ok(())
-}
-fn execute_and_print_query(conn: &Connection, sql_query: &str) -> Result<(), Error> {
-    let mut stmt = conn.statement(sql_query).build()?;
-    let rows = stmt.query(&[])?;
-    for row_result in rows {
-        let row = row_result?;
-        let view_name: String = row.get("view_name")?;
-        println!("View: {}", view_name);
-    }
     Ok(())
 }
