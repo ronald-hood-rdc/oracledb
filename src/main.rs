@@ -1,13 +1,32 @@
 use dotenv::dotenv;
 use oracle::{
     pool::{self, Pool},
-    Connection, Error,
+    Error, RowValue,
 };
 use std::env;
-use std::fs::File;
-use std::io::{Result as IoResult, Write};
 
 const LIST_VIEWS_QUERY: &str = "SELECT view_name FROM all_views";
+
+// Define a struct to hold the row data
+#[derive(Debug, RowValue)]
+struct MlsContactsV2 {
+    mls_account_party_id: Option<f64>, // Using Option<> to handle possible NULL values
+    mls_formal_name: Option<String>,
+    mls_id: Option<String>,
+    ir_rep: Option<String>,
+    mls_internet_name: Option<String>,
+    state: Option<String>,
+    mls_account_fulfillment_id: Option<String>,
+    contact_info: Option<String>,
+    doc_id: Option<f64>,
+}
+
+// Adjusted query to select specified fields from MLS_CONTACTS_V2 and limit to first 5 rows
+const LIST_MLS_CONTACTS_QUERY: &str = "
+SELECT MLS_ACCOUNT_PARTY_ID, MLS_FORMAL_NAME, MLS_ID, IR_REP, MLS_INTERNET_NAME, 
+       STATE, MLS_ACCOUNT_FULFILLMENT_ID, CONTACT_INFO, DOC_ID 
+FROM MLS_CONTACTS_V2 
+FETCH FIRST 5 ROWS ONLY";
 
 fn main() -> Result<(), Error> {
     dotenv().ok();
@@ -15,22 +34,23 @@ fn main() -> Result<(), Error> {
     let pool = create_connection_pool(&db_url)?;
     let conn = pool.get()?;
 
-    let mut stmt = conn.statement(LIST_VIEWS_QUERY).build()?;
-    let rows = stmt.query(&[])?;
+    //let mut stmt = conn.statement(LIST_VIEWS_QUERY).build().unwrap();
+    // let rows = stmt.query(&[]).unwrap();
 
-    let mut views_columns = Vec::new();
+    //   for row_result in rows {
+    //     let row: oracle::Row = row_result?; // Handle the Result from iterating over rows
+    //      let view_name: String = row.get("view_name")?; // Extract the view_name column
+    //       println!("View Name: {}", view_name);
+    //   }
+    //list_views(&conn);
+
+    let mut stmt = conn.statement(LIST_MLS_CONTACTS_QUERY).build()?;
+    let rows = stmt.query_as::<MlsContactsV2>(&[])?;
 
     for row_result in rows {
-        let row = row_result?;
-        let view_name: String = row.get("view_name")?;
-
-        let columns = get_columns_for_view(&conn, &view_name.to_uppercase())?;
-        dbg!((&view_name, &columns));
-        views_columns.push((view_name, columns));
+        let row: MlsContactsV2 = row_result?;
+        println!("{:?}", row);
     }
-
-    write_schema_file(views_columns).unwrap();
-
     Ok(())
 }
 
@@ -45,49 +65,7 @@ fn create_connection_pool(db_url: &str) -> Result<Pool, Error> {
     let user = env::var("USER").expect("USER not set in .env file");
     let password = env::var("PASSWORD").expect("PASSWORD not set in .env file");
 
-    pool::PoolBuilder::new(user, password, db_url).build()
-}
-
-fn get_columns_for_view(
-    conn: &Connection,
-    view_name: &str,
-) -> Result<Vec<(String, String)>, Error> {
-    let sql = "SELECT column_name, data_type FROM all_tab_columns WHERE table_name = :1";
-    let mut stmt = conn.statement(sql).build()?;
-    let rows = stmt.query(&[&view_name])?;
-
-    let mut columns = Vec::new();
-    for row_result in rows {
-        let row = row_result?;
-        let column_name: String = row.get("column_name")?;
-        let data_type: String = row.get("data_type")?;
-        columns.push((column_name, data_type));
-    }
-
-    Ok(columns)
-}
-
-fn oracle_type_to_graphql(oracle_type: &str) -> &'static str {
-    match oracle_type {
-        "VARCHAR2" | "CHAR" | "NVARCHAR2" | "CLOB" => "String",
-        "NUMBER" | "FLOAT" | "DECIMAL" => "Float",
-        "INTEGER" | "SMALLINT" => "Int",
-        "DATE" | "TIMESTAMP" => "String", // Dates and timestamps are represented as strings in GraphQL; consider using custom scalar types for date/time.
-        _ => "String",                    // Default fallback
-    }
-}
-
-fn write_schema_file(views_columns: Vec<(String, Vec<(String, String)>)>) -> IoResult<()> {
-    let mut file = File::create("schema.graphql")?;
-
-    for (view_name, columns) in views_columns {
-        writeln!(&mut file, "type {} {{", view_name)?;
-        for (column_name, data_type) in columns {
-            let graphql_type = oracle_type_to_graphql(&data_type);
-            writeln!(&mut file, "  {}: {}", column_name, graphql_type)?;
-        }
-        writeln!(&mut file, "}}\n")?;
-    }
-
-    Ok(())
+    pool::PoolBuilder::new(user, password, db_url)
+        .max_connections(20)
+        .build()
 }
