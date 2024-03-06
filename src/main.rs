@@ -4,7 +4,8 @@ use oracle::{
     Error, RowValue,
 };
 use std::env;
-
+use std::fs::File;
+use std::io::Write;
 const LIST_VIEWS_QUERY: &str = "SELECT view_name FROM all_views";
 
 // Define a struct to hold the row data
@@ -34,23 +35,29 @@ fn main() -> Result<(), Error> {
     let pool = create_connection_pool(&db_url)?;
     let conn = pool.get()?;
 
-    //let mut stmt = conn.statement(LIST_VIEWS_QUERY).build().unwrap();
-    // let rows = stmt.query(&[]).unwrap();
+    let mut stmt = conn.statement(LIST_VIEWS_QUERY).build().unwrap();
+    let rows = stmt.query(&[]).unwrap();
 
-    //   for row_result in rows {
-    //     let row: oracle::Row = row_result?; // Handle the Result from iterating over rows
-    //      let view_name: String = row.get("view_name")?; // Extract the view_name column
-    //       println!("View Name: {}", view_name);
-    //   }
+    let mut file = File::create("views.txt").expect("error");
+    for row_result in rows {
+        let row: oracle::Row = row_result?; // Handle the Result from iterating over rows
+        let view_name: String = row.get("view_name")?; // Extract the view_name column
+
+        writeln!(&mut file, "View Name: {}", view_name).expect("msg");
+    }
+
     //list_views(&conn);
 
-    let mut stmt = conn.statement(LIST_MLS_CONTACTS_QUERY).build()?;
+    /*  let mut stmt = conn.statement(LIST_VIEWS_QUERY).build()?;
     let rows = stmt.query_as::<MlsContactsV2>(&[])?;
 
     for row_result in rows {
         let row: MlsContactsV2 = row_result?;
         println!("{:?}", row);
-    }
+    }*/
+
+    
+
     Ok(())
 }
 
@@ -69,3 +76,16 @@ fn create_connection_pool(db_url: &str) -> Result<Pool, Error> {
         .max_connections(20)
         .build()
 }
+// account hierarchy table and account response has a acouple attributes. Look at schema, partyid is the objectid.
+/*
+ * subject id is the party id for that account, partyid means that the account might be parent of another account.
+ relationship type explains how the subject id is related to the party id, contact or member or parernt etc.
+ In CIS, go toa ccount, getch infromation and based on the relationship it foes to the hierarchy table. Trying to fetch from different views then does the stitching work
+ If there is a view it will just fetch from the view, graphql may not be optimal.
+ Graphql is better at one time fetch rather than stitching things together.
+ If try to keep flatten file, it will be overwhelming for the update of the file. Updates the view so that specific informaiton si updated,
+ the entire response is then generated lazely.
+not everyone is interested in document type, if yuo could expose partyid. logic will be handled by the client.
+can fetch information for indiviudal account for the mls sets. If they want the entire hierarchy then they can go to legqcy CIS.
+
+ */
