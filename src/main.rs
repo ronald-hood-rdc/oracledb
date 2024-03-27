@@ -34,16 +34,17 @@ fn main() -> Result<(), Error> {
     let db_url = construct_db_url().unwrap();
     let pool = create_connection_pool(&db_url)?;
     let conn = pool.get()?;
+    let mut file = File::create("views.txt").expect("error");
 
-    let mut stmt = conn.statement(LIST_VIEWS_QUERY).build().unwrap();
+    /*let mut stmt = conn.statement(LIST_VIEWS_QUERY).build().unwrap();
     let rows = stmt.query(&[]).unwrap();
 
-    let mut file = File::create("views.txt").expect("error");
+
     for row_result in rows {
         let row: oracle::Row = row_result?; // Handle the Result from iterating over rows
         let view_name: String = row.get("view_name")?; // Extract the view_name column
 
-        writeln!(&mut file, "View Name: {}", view_name).expect("msg");
+
     }
 
     //list_views(&conn);
@@ -56,7 +57,41 @@ fn main() -> Result<(), Error> {
         println!("{:?}", row);
     }*/
 
-    
+    const GET_COLUMN_NAMES_QUERY: &str = "
+        SELECT COLUMN_NAME
+        FROM ALL_TAB_COLUMNS
+        WHERE TABLE_NAME = 'PARTY_INFO_V2_V'";
+    const GET_FIRST_ROWS_QUERY: &str = "
+        SELECT *
+        FROM PARTY_INFO_V2_V
+        FETCH FIRST 5 ROWS ONLY";
+
+    // Query and display column names for PARTY_INFO_V2_V
+    let mut stmt = conn.statement(GET_COLUMN_NAMES_QUERY).build().unwrap();
+    let cols = stmt.query(&[]).unwrap();
+
+    println!("Column Names for PARTY_INFO_V2_V:");
+    for col_result in cols {
+        let col: oracle::Row = col_result?;
+        let column_name: String = col.get("COLUMN_NAME")?;
+        println!("{}", column_name);
+    }
+    // here*/
+    let sql = "select party_id,party_info from CCD.party_info_v2_v";
+    //et sql =
+    //"SELECT * FROM DBA_TAB_PRIVS WHERE TABLE_NAME = 'PARTY_INFO_V2_V' AND PRIVILEGE = 'SELECT'"; //"SELECT VIEW_NAME FROM ALL_VIEWS WHERE VIEW_NAME = 'PARTY_INFO_V2_V'";
+    // Query and display the first few rows of PARTY_INFO_V2_V
+    let mut stmt = conn.statement(sql).build().unwrap();
+    let rows = stmt.query(&[])?;
+
+    println!("\nFirst Few Rows of PARTY_INFO_V2_V:");
+    for row_result in rows {
+        // Here we handle the Result type for each row
+        let row = row_result?;
+        // Now, safely extract the expected tuple from the row
+
+        writeln!(&mut file, "View Name: {:?}", row).expect("msg");
+    }
 
     Ok(())
 }
@@ -65,6 +100,8 @@ fn construct_db_url() -> Result<String, env::VarError> {
     let host_name = env::var("HOST_NAME")?;
     let port = env::var("PORT")?;
     let sid = env::var("SID")?;
+    let stringg = format!("//{}:{}/{}", host_name, port, sid);
+    dbg!(stringg);
     Ok(format!("//{}:{}/{}", host_name, port, sid))
 }
 
