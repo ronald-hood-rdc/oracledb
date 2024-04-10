@@ -1067,6 +1067,8 @@ dependencies = [
  "actix-web",
  "dotenv",
  "oracle",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
