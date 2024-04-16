@@ -98,7 +98,6 @@ async fn get_party_info(party_id: u32, conn: &Connection) -> PartyInfo {
     let mut stmt = conn.statement(&sql).build().unwrap();
     let mut rows = stmt.query(&[]).expect("Failed to execute query");
     let info: PartyInfo;
-    println!("\nOD CRASHOUT");
     let row_result = rows.next().unwrap();
     let row = row_result.expect("Failed to get row");
     let sql_values = &row.sql_values()[1].get::<String>().unwrap();
