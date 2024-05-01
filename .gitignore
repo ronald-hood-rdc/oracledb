@@ -1,2 +1,5 @@
 /target
 .env
+es/dist
+es/node_modules/
+es/package-lock.json
