@@ -10,10 +10,18 @@ const client = new Client({
 });
 
 app.get("/", async (req: Request, res: Response) => {
-  const partyId = req.query.party_id;
   try {
     console.log("hit", new Date().toLocaleTimeString());
 
+    /*const { body } = await client.indices.getMapping({
+      index: "party-contacts-index",
+    });
+
+    console.log("Mapping:", body);*/
+
+    //const { body } = await client.cluster.health();
+
+    const partyId = req.query.partyId as string;
     const elasticSearchQueryParams = {
       index: "party-contacts-index",
       body: {
@@ -22,11 +30,16 @@ app.get("/", async (req: Request, res: Response) => {
             party_id: partyId,
           },
         },
-        _source: ["party_id", "party_info"],
+        _source: ["*"],
       },
     };
 
     const { body } = await client.search(elasticSearchQueryParams);
+    const hits = body.hits.hits;
+    hits.forEach((hit: any) => {
+      console.log(hit._source); // Log the retrieved fields
+    });
+
     res.json(body);
   } catch (error) {
     console.error("Error connecting to Elasticsearch:", error);
@@ -37,3 +50,7 @@ app.get("/", async (req: Request, res: Response) => {
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
+
+/**
+ * {"emails":{"properties":{"email_address":{"type":"text","fields":{"keyword":{"type":"keyword"}},"analyzer":"urls-links-emails","fielddata":true},"status":{"type":"keyword"}}},"party_id":{"type":"keyword"},"party_name":{"type":"text","analyzer":"name_synonym_analyzer","fielddata":true},"phones":{"properties":{"phone_number":{"type":"text","fields":{"keyword":{"type":"keyword","ignore_above":256}}
+ */
